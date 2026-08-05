@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TaskLoop — Daily Tasks</title>
 <meta name="description" content="Daily recurring tasks with automatic 24-hour resets and reminders.">
+<link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#2563eb">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -638,6 +639,8 @@
 
   let apiBase = localStorage.getItem(API_KEY) || DEFAULT_API;
 
+  const DEFAULT_SETTINGS = { enabled: false, morning: "05:00", evening: "20:00", sound: "chime", volume: 80 };
+
   let todos = [];
   let filter = "all";
   let settings = loadSettings();
@@ -751,8 +754,6 @@
     resetExpired();
     render();
   }
-
-  const DEFAULT_SETTINGS = { enabled: false, morning: "05:00", evening: "20:00", sound: "chime", volume: 80 };
 
   function loadSettings() {
     try {
