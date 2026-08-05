@@ -315,6 +315,46 @@
   }
   .btn-schedule:hover { background: #dbeafe; }
 
+  .sound-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .sound-label { font-size: 0.8rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  select {
+    padding: 9px 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--text);
+    outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+  input[type="range"] {
+    flex: 1;
+    min-width: 90px;
+    accent-color: var(--accent);
+    height: 30px;
+  }
+  .btn-test-mini {
+    padding: 9px 14px;
+    background: #eff6ff;
+    color: var(--accent);
+    border: none;
+    border-radius: 9px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .btn-test-mini:hover { background: #dbeafe; }
+
   .hint { margin-top: 12px; font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
   .hint strong { color: var(--text); }
 
@@ -396,7 +436,21 @@
         <button class="btn-schedule" id="scheduleBtn">Sync reminders</button>
       </div>
 
+      <div class="sound-row">
+        <span class="sound-label">Sound</span>
+        <select id="soundSelect">
+          <option value="chime">Chime</option>
+          <option value="bells">Bells</option>
+          <option value="beeps">Beeps</option>
+          <option value="alarm">Alarm</option>
+        </select>
+        <input type="range" id="soundVolume" min="1" max="100" value="80" aria-label="Sound volume">
+        <span class="count" id="volumeLabel">80%</span>
+        <button class="btn-test-mini" id="soundTest">Play</button>
+      </div>
+
       <div class="hint" id="reminderHint"></div>
+      <div class="hint">The sound plays while the app is open. Phone notifications from the system always use your phone's default notification sound.</div>
     </section>
 
     <p class="foot-note">Tasks you complete come back automatically after 24 hours.</p>
@@ -437,6 +491,10 @@
   const timeEvening = document.getElementById("timeEvening");
   const reminderStatus = document.getElementById("reminderStatus");
   const reminderHint = document.getElementById("reminderHint");
+  const soundSelect = document.getElementById("soundSelect");
+  const soundVolume = document.getElementById("soundVolume");
+  const volumeLabel = document.getElementById("volumeLabel");
+  const soundTest = document.getElementById("soundTest");
 
   document.getElementById("dateLabel").textContent = new Date().toLocaleDateString(undefined, {
     weekday: "long", year: "numeric", month: "long", day: "numeric"
@@ -452,12 +510,14 @@
     }
   }
 
+  const DEFAULT_SETTINGS = { enabled: false, morning: "05:00", evening: "20:00", sound: "chime", volume: 80 };
+
   function loadSettings() {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
-      return raw ? Object.assign({ enabled: false, morning: "05:00", evening: "20:00" }, JSON.parse(raw)) : { enabled: false, morning: "05:00", evening: "20:00" };
+      return raw ? Object.assign({}, DEFAULT_SETTINGS, JSON.parse(raw)) : Object.assign({}, DEFAULT_SETTINGS);
     } catch {
-      return { enabled: false, morning: "05:00", evening: "20:00" };
+      return Object.assign({}, DEFAULT_SETTINGS);
     }
   }
 
@@ -592,24 +652,33 @@
     emptyState.hidden = visible.length > 0;
   }
 
+  const SOUND_PRESETS = {
+    chime: { type: "sine", notes: [660, 880], gap: 0.18 },
+    bells: { type: "triangle", notes: [523.25, 659.25, 783.99], gap: 0.25 },
+    beeps: { type: "square", notes: [880, 880, 880], gap: 0.3 },
+    alarm: { type: "sawtooth", notes: [880, 659.25, 880, 659.25], gap: 0.2 }
+  };
+
   function playChime() {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
     try {
       const ctx = new AudioCtx();
-      [660, 880].forEach((freq, i) => {
+      const preset = SOUND_PRESETS[settings.sound] || SOUND_PRESETS.chime;
+      const vol = Math.max(0.05, Math.min(1, (settings.volume || 80) / 100));
+      preset.notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sine";
+        osc.type = preset.type;
         osc.frequency.value = freq;
-        const t = ctx.currentTime + i * 0.18;
+        const t = ctx.currentTime + i * preset.gap;
         gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        gain.gain.linearRampToValueAtTime(vol, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.45);
+        osc.stop(t + 0.55);
       });
     } catch (e) { /* audio blocked */ }
   }
@@ -639,6 +708,9 @@
     timeEvening.value = settings.evening;
     reminderStatus.textContent = settings.enabled ? "On" : "Off";
     reminderStatus.classList.toggle("on", settings.enabled);
+    soundSelect.value = settings.sound;
+    soundVolume.value = settings.volume;
+    volumeLabel.textContent = settings.volume + "%";
     updateReminderHint();
   }
 
@@ -684,6 +756,21 @@
       saveSettings();
       refreshScheduled();
     });
+  });
+
+  soundSelect.addEventListener("change", () => {
+    settings.sound = soundSelect.value;
+    saveSettings();
+  });
+
+  soundVolume.addEventListener("input", () => {
+    settings.volume = Number(soundVolume.value);
+    volumeLabel.textContent = soundVolume.value + "%";
+    saveSettings();
+  });
+
+  soundTest.addEventListener("click", () => {
+    playChime();
   });
 
   document.getElementById("testBtn").addEventListener("click", () => {
