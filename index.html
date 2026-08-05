@@ -359,6 +359,120 @@
   .hint strong { color: var(--text); }
 
   .foot-note { text-align: center; font-size: 0.72rem; color: var(--muted); margin-top: 20px; }
+
+  .user-area { display: flex; align-items: center; gap: 8px; }
+  .user-chip {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text);
+    background: #eff6ff;
+    padding: 6px 10px;
+    border-radius: 999px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .btn-logout {
+    padding: 8px 12px;
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid #fecaca;
+    border-radius: 9px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .btn-logout:hover { background: #fef2f2; }
+
+  .auth-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .auth-overlay.hidden { display: none; }
+  .auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 28px 24px;
+  }
+  .auth-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .auth-logo svg { width: 30px; height: 30px; }
+  .auth-title { text-align: center; font-size: 1.2rem; font-weight: 700; }
+  .auth-sub { text-align: center; color: var(--muted); font-size: 0.82rem; margin: 4px 0 20px; }
+  .auth-card input[type="text"], .auth-card input[type="password"] {
+    width: 100%;
+    padding: 13px;
+    font-size: 1rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    outline: none;
+    margin-bottom: 10px;
+    background: var(--card);
+    color: var(--text);
+  }
+  .auth-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
+  .auth-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 11px;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .auth-btn:hover { background: var(--accent-hover); }
+  .auth-loading { opacity: 0.6; pointer-events: none; }
+  .auth-error {
+    background: #fef2f2;
+    color: var(--danger);
+    font-size: 0.8rem;
+    border-radius: 9px;
+    padding: 9px 12px;
+    margin-bottom: 10px;
+  }
+  .auth-switch { text-align: center; margin-top: 16px; font-size: 0.85rem; color: var(--muted); }
+  .auth-switch a { color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(20px);
+    background: #1e293b;
+    color: #fff;
+    font-size: 0.82rem;
+    padding: 10px 16px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 200;
+    pointer-events: none;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -375,7 +489,11 @@
           <div class="date" id="dateLabel"></div>
         </div>
       </div>
-      <button class="btn-install" id="installBtn" hidden>Install</button>
+      <div class="user-area">
+        <span class="user-chip" id="userChip" hidden></span>
+        <button class="btn-logout" id="logoutBtn" hidden>Logout</button>
+        <button class="btn-install" id="installBtn" hidden>Install</button>
+      </div>
     </header>
 
     <section class="card card-pad">
@@ -453,29 +571,55 @@
       <div class="hint">The sound plays while the app is open. Phone notifications from the system always use your phone's default notification sound.</div>
     </section>
 
+    <section class="card card-pad">
+      <div class="section-title">Server</div>
+      <div class="add-form">
+        <input type="text" id="apiUrl" placeholder="http://localhost:4000/api" autocomplete="off">
+        <button class="btn-add" id="saveApiBtn">Save</button>
+      </div>
+      <div class="hint">Address of the TaskLoop backend. On your phone use your PC's network address, e.g. <strong>http://192.168.0.101:4000/api</strong>.</div>
+    </section>
+
     <p class="foot-note">Tasks you complete come back automatically after 24 hours.</p>
   </main>
 
+  <section class="auth-overlay" id="authOverlay">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="auth-title" id="authTitle">Welcome back</div>
+      <div class="auth-sub" id="authSub">Sign in to manage your daily tasks</div>
+      <div class="auth-error" id="authError" hidden></div>
+      <input type="text" id="authUser" placeholder="Username" autocomplete="username" maxlength="30">
+      <input type="password" id="authPass" placeholder="Password" autocomplete="current-password">
+      <button class="auth-btn" id="authBtn">Log in</button>
+      <div class="auth-switch">
+        Don't have an account? <a id="authToggle">Create one</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
 <script>
-  const STORAGE_KEY = "taskloop.todos";
   const SETTINGS_KEY = "taskloop.settings";
+  const CACHE_KEY = "taskloop.cache";
+  const TOKEN_KEY = "taskloop.token";
+  const USER_KEY = "taskloop.user";
+  const API_KEY = "taskloop.api";
   const REPEAT_MS = 24 * 60 * 60 * 1000;
 
-  const sampleTasks = [
-    { id: uid(), text: "Review quarterly goals and set priorities", done: false },
-    { id: uid(), text: "Draft project proposal for client", done: false },
-    { id: uid(), text: "Prepare slides for Monday standup", done: true, doneAt: Date.now() - 20 * 3600 * 1000 },
-    { id: uid(), text: "Reply to team emails", done: true, doneAt: Date.now() - 2 * 3600 * 1000 }
-  ];
+  const API_BASE = localStorage.getItem(API_KEY) || "http://localhost:4000/api";
 
-  function uid() {
-    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
-    return "id-" + Date.now() + "-" + Math.random().toString(36).slice(2);
-  }
-
-  let todos = loadTodos();
+  let todos = [];
   let filter = "all";
   let settings = loadSettings();
+  let token = localStorage.getItem(TOKEN_KEY) || null;
+  let sessionUser = localStorage.getItem(USER_KEY) || null;
+  let authMode = "login";
   const firedKeys = new Set();
 
   const todoInput = document.getElementById("todoInput");
@@ -495,19 +639,91 @@
   const soundVolume = document.getElementById("soundVolume");
   const volumeLabel = document.getElementById("volumeLabel");
   const soundTest = document.getElementById("soundTest");
+  const authOverlay = document.getElementById("authOverlay");
+  const authTitle = document.getElementById("authTitle");
+  const authSub = document.getElementById("authSub");
+  const authError = document.getElementById("authError");
+  const authUser = document.getElementById("authUser");
+  const authPass = document.getElementById("authPass");
+  const authBtn = document.getElementById("authBtn");
+  const authToggle = document.getElementById("authToggle");
+  const userChip = document.getElementById("userChip");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const toast = document.getElementById("toast");
+  const apiUrl = document.getElementById("apiUrl");
+  const saveApiBtn = document.getElementById("saveApiBtn");
 
   document.getElementById("dateLabel").textContent = new Date().toLocaleDateString(undefined, {
     weekday: "long", year: "numeric", month: "long", day: "numeric"
   });
 
-  function loadTodos() {
+  function loadCache() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(CACHE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
-      return Array.isArray(parsed) ? parsed : JSON.parse(JSON.stringify(sampleTasks));
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return JSON.parse(JSON.stringify(sampleTasks));
+      return [];
     }
+  }
+
+  function saveCache() {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(todos));
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toast.classList.remove("show"), 3200);
+  }
+
+  async function api(path, options = {}) {
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers.Authorization = "Bearer " + token;
+    const res = await fetch(API_BASE + path, { ...options, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || "Request failed");
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function showApp() {
+    authOverlay.classList.add("hidden");
+    userChip.hidden = false;
+    userChip.textContent = sessionUser || "";
+    logoutBtn.hidden = false;
+  }
+
+  function showLogin() {
+    authOverlay.classList.remove("hidden");
+    userChip.hidden = true;
+    logoutBtn.hidden = true;
+  }
+
+  function logout() {
+    token = null;
+    sessionUser = null;
+    todos = [];
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    showLogin();
+  }
+
+  async function loadTasks() {
+    try {
+      todos = await api("/tasks");
+      saveCache();
+    } catch (e) {
+      if (e.status === 401) { showLogin(); return; }
+      todos = loadCache();
+      showToast("Server unreachable - showing saved tasks");
+    }
+    resetExpired();
+    render();
   }
 
   const DEFAULT_SETTINGS = { enabled: false, morning: "05:00", evening: "20:00", sound: "chime", volume: 80 };
@@ -521,31 +737,36 @@
     }
   }
 
-  function saveTodos() { localStorage.setItem(STORAGE_KEY, JSON.stringify(todos)); }
   function saveSettings() { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
 
   function resetExpired() {
     const now = Date.now();
     let changed = false;
     todos.forEach((t) => {
-      if (t.done && t.doneAt && now - t.doneAt >= REPEAT_MS) {
+      if (t.done && t.doneAt && now - new Date(t.doneAt).getTime() >= REPEAT_MS) {
         t.done = false;
         t.doneAt = null;
         changed = true;
+        api("/tasks/" + t.id, { method: "PUT", body: JSON.stringify({ done: false }) }).catch(() => {});
       }
     });
-    if (changed) { saveTodos(); render(); }
+    if (changed) { saveCache(); render(); }
   }
 
-  addForm.addEventListener("submit", (e) => {
+  addForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = todoInput.value.trim();
     if (!text) return;
-    todos.push({ id: uid(), text, done: false, doneAt: null });
-    todoInput.value = "";
-    saveTodos();
-    render();
-    todoInput.focus();
+    try {
+      const task = await api("/tasks", { method: "POST", body: JSON.stringify({ text }) });
+      todos.push(task);
+      saveCache();
+      todoInput.value = "";
+      render();
+      todoInput.focus();
+    } catch (err) {
+      showToast(err.message);
+    }
   });
 
   document.getElementById("filters").addEventListener("click", (e) => {
@@ -556,36 +777,45 @@
     render();
   });
 
-  todoList.addEventListener("click", (e) => {
+  todoList.addEventListener("click", async (e) => {
     const item = e.target.closest(".todo-item");
     if (!item) return;
     const id = item.dataset.id;
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
 
     if (e.target.closest(".checkbox")) {
-      const todo = todos.find((t) => t.id === id);
-      if (!todo) return;
-      todo.done = !todo.done;
-      todo.doneAt = todo.done ? Date.now() : null;
-      saveTodos();
-      render();
+      try {
+        const updated = await api("/tasks/" + id, { method: "PUT", body: JSON.stringify({ done: !todo.done }) });
+        const idx = todos.findIndex((t) => t.id === id);
+        if (idx >= 0) todos[idx] = updated;
+        saveCache();
+        render();
+      } catch (err) { showToast(err.message); }
     }
 
     if (e.target.closest(".delete-btn")) {
-      todos = todos.filter((t) => t.id !== id);
-      saveTodos();
-      render();
+      try {
+        await api("/tasks/" + id, { method: "DELETE" });
+        todos = todos.filter((t) => t.id !== id);
+        saveCache();
+        render();
+      } catch (err) { showToast(err.message); }
     }
   });
 
-  clearCompleted.addEventListener("click", () => {
-    todos = todos.filter((t) => !t.done);
-    saveTodos();
-    render();
+  clearCompleted.addEventListener("click", async () => {
+    try {
+      await api("/tasks/completed", { method: "DELETE" });
+      todos = todos.filter((t) => !t.done);
+      saveCache();
+      render();
+    } catch (err) { showToast(err.message); }
   });
 
   function remainingLabel(t) {
     if (!t.done || !t.doneAt) return null;
-    const ms = REPEAT_MS - (Date.now() - t.doneAt);
+    const ms = REPEAT_MS - (Date.now() - new Date(t.doneAt).getTime());
     if (ms <= 0) return null;
     const h = Math.floor(ms / 3600000);
     const m = Math.floor((ms % 3600000) / 60000);
@@ -878,19 +1108,91 @@
     });
   }
 
-  updateReminderUI();
-  resetExpired();
-  render();
-  if (settings.enabled) {
-    requestPermission();
-    refreshScheduled();
+  apiUrl.value = API_BASE;
+  saveApiBtn.addEventListener("click", () => {
+    const v = apiUrl.value.trim().replace(/\/+$/, "");
+    if (!v) return;
+    localStorage.setItem(API_KEY, v);
+    showToast("Server saved - reloading...");
+    setTimeout(() => location.reload(), 600);
+  });
+
+  authToggle.addEventListener("click", () => {
+    authMode = authMode === "login" ? "signup" : "login";
+    authTitle.textContent = authMode === "login" ? "Welcome back" : "Create your account";
+    authSub.textContent = authMode === "login" ? "Sign in to manage your daily tasks" : "Your tasks will be saved securely";
+    authBtn.textContent = authMode === "login" ? "Log in" : "Create account";
+    authToggle.textContent = authMode === "login" ? "Create one" : "Log in instead";
+    authError.hidden = true;
+  });
+
+  async function submitAuth() {
+    const username = authUser.value.trim();
+    const password = authPass.value;
+    if (!username || !password) {
+      authError.textContent = "Enter a username and password.";
+      authError.hidden = false;
+      return;
+    }
+    authBtn.classList.add("auth-loading");
+    authError.hidden = true;
+    try {
+      const data = await api("/auth/" + (authMode === "login" ? "login" : "signup"), {
+        method: "POST",
+        body: JSON.stringify({ username, password })
+      });
+      token = data.token;
+      sessionUser = data.username;
+      localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem(USER_KEY, sessionUser);
+      authPass.value = "";
+      showApp();
+      await loadTasks();
+    } catch (err) {
+      authError.textContent = err.message;
+      authError.hidden = false;
+    } finally {
+      authBtn.classList.remove("auth-loading");
+    }
   }
-  setInterval(() => {
-    resetExpired();
-    render();
-    checkInAppReminder();
-  }, 30000);
-  setInterval(refreshScheduled, 3600000);
+
+  authBtn.addEventListener("click", submitAuth);
+  [authUser, authPass].forEach((el) => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") submitAuth(); });
+  });
+  logoutBtn.addEventListener("click", logout);
+
+  (async function init() {
+    updateReminderUI();
+    if (token) {
+      try {
+        const me = await api("/auth/me");
+        sessionUser = me.username;
+        localStorage.setItem(USER_KEY, sessionUser);
+        showApp();
+        await loadTasks();
+      } catch (e) {
+        if (e.status !== 401) {
+          todos = loadCache();
+          render();
+          showToast("Server unreachable - showing saved tasks");
+        }
+        showLogin();
+      }
+    } else {
+      showLogin();
+    }
+    if (settings.enabled) {
+      requestPermission();
+      refreshScheduled();
+    }
+    setInterval(() => {
+      resetExpired();
+      render();
+      checkInAppReminder();
+    }, 30000);
+    setInterval(refreshScheduled, 3600000);
+  })();
 </script>
 </body>
 </html>
