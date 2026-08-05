@@ -639,6 +639,13 @@
 
   let apiBase = localStorage.getItem(API_KEY) || DEFAULT_API;
 
+  (function detectApi() {
+    const host = location.hostname;
+    if (location.protocol === "http:" && host && host !== "localhost" && host !== "127.0.0.1" && !localStorage.getItem(API_KEY)) {
+      apiBase = "http://" + host + ":4000/api";
+    }
+  })();
+
   const DEFAULT_SETTINGS = { enabled: false, morning: "05:00", evening: "20:00", sound: "chime", volume: 80 };
 
   let todos = [];
@@ -1149,7 +1156,7 @@
   function updateApiHint() {
     let msg = "";
     if (location.protocol === "https:" && apiBase.indexOf("http://") === 0) {
-      msg = "<strong>Warning:</strong> this page is HTTPS but the server is http:// - browsers block that. Open the app at <strong>http://localhost:8000</strong> instead, or use an https server address.";
+      msg = "<strong>Blocked by your browser:</strong> this page is HTTPS but the server address is http://. Browsers block that. Instead open the app on your phone at <strong>http://192.168.0.101:8000</strong> (same Wi-Fi as your PC), and the Server address will fill in automatically.";
     }
     authApiHint.innerHTML = msg;
   }
