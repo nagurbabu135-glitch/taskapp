@@ -453,6 +453,24 @@
   }
   .auth-switch { text-align: center; margin-top: 16px; font-size: 0.85rem; color: var(--muted); }
   .auth-switch a { color: var(--accent); font-weight: 600; text-decoration: none; cursor: pointer; }
+  .auth-server {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .auth-server-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .auth-server input[type="text"] {
+    width: 100%;
+    padding: 11px 12px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    outline: none;
+    background: var(--card);
+    color: var(--text);
+  }
+  .auth-server input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); }
 
   .toast {
     position: fixed;
@@ -599,6 +617,11 @@
       <div class="auth-switch">
         Don't have an account? <a id="authToggle">Create one</a>
       </div>
+      <div class="auth-server">
+        <div class="auth-server-label">Server address</div>
+        <input type="text" id="authApiUrl" placeholder="http://localhost:4000/api" autocomplete="off" spellcheck="false">
+        <div class="hint" id="authApiHint"></div>
+      </div>
     </div>
   </section>
 
@@ -610,9 +633,10 @@
   const TOKEN_KEY = "taskloop.token";
   const USER_KEY = "taskloop.user";
   const API_KEY = "taskloop.api";
+  const DEFAULT_API = "http://localhost:4000/api";
   const REPEAT_MS = 24 * 60 * 60 * 1000;
 
-  const API_BASE = localStorage.getItem(API_KEY) || "http://localhost:4000/api";
+  let apiBase = localStorage.getItem(API_KEY) || DEFAULT_API;
 
   let todos = [];
   let filter = "all";
@@ -652,6 +676,8 @@
   const toast = document.getElementById("toast");
   const apiUrl = document.getElementById("apiUrl");
   const saveApiBtn = document.getElementById("saveApiBtn");
+  const authApiUrl = document.getElementById("authApiUrl");
+  const authApiHint = document.getElementById("authApiHint");
 
   document.getElementById("dateLabel").textContent = new Date().toLocaleDateString(undefined, {
     weekday: "long", year: "numeric", month: "long", day: "numeric"
@@ -681,7 +707,7 @@
   async function api(path, options = {}) {
     const headers = { "Content-Type": "application/json" };
     if (token) headers.Authorization = "Bearer " + token;
-    const res = await fetch(API_BASE + path, { ...options, headers });
+    const res = await fetch(apiBase + path, { ...options, headers });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data.error || "Request failed");
@@ -1108,14 +1134,30 @@
     });
   }
 
-  apiUrl.value = API_BASE;
-  saveApiBtn.addEventListener("click", () => {
-    const v = apiUrl.value.trim().replace(/\/+$/, "");
-    if (!v) return;
-    localStorage.setItem(API_KEY, v);
-    showToast("Server saved - reloading...");
-    setTimeout(() => location.reload(), 600);
-  });
+  function saveApiBase(v) {
+    const clean = v.trim().replace(/\/+$/, "");
+    if (!clean) return;
+    localStorage.setItem(API_KEY, clean);
+    apiBase = clean;
+    apiUrl.value = clean;
+    authApiUrl.value = clean;
+    updateApiHint();
+    showToast("Server address saved.");
+  }
+
+  function updateApiHint() {
+    let msg = "";
+    if (location.protocol === "https:" && apiBase.indexOf("http://") === 0) {
+      msg = "<strong>Warning:</strong> this page is HTTPS but the server is http:// - browsers block that. Open the app at <strong>http://localhost:8000</strong> instead, or use an https server address.";
+    }
+    authApiHint.innerHTML = msg;
+  }
+
+  apiUrl.value = apiBase;
+  authApiUrl.value = apiBase;
+  saveApiBtn.addEventListener("click", () => saveApiBase(apiUrl.value));
+  authApiUrl.addEventListener("change", () => saveApiBase(authApiUrl.value));
+  updateApiHint();
 
   authToggle.addEventListener("click", () => {
     authMode = authMode === "login" ? "signup" : "login";
@@ -1149,7 +1191,9 @@
       showApp();
       await loadTasks();
     } catch (err) {
-      authError.textContent = err.message;
+      authError.textContent = (err && err.status)
+        ? err.message
+        : "Can't reach the server at " + apiBase + ". Check the Server address above and that the backend is running.";
       authError.hidden = false;
     } finally {
       authBtn.classList.remove("auth-loading");
