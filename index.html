@@ -640,10 +640,16 @@
   let apiBase = localStorage.getItem(API_KEY) || DEFAULT_API;
 
   (function detectApi() {
-    const host = location.hostname;
-    if (location.protocol === "http:" && host && host !== "localhost" && host !== "127.0.0.1" && !localStorage.getItem(API_KEY)) {
-      apiBase = "http://" + host + ":4000/api";
-    }
+    if (location.protocol !== "http:") return;
+    const saved = localStorage.getItem(API_KEY);
+    if (!saved) { apiBase = "/api"; return; }
+    try {
+      const savedHost = new URL(saved).hostname;
+      if (savedHost !== location.hostname && savedHost !== "localhost" && savedHost !== "127.0.0.1") {
+        localStorage.removeItem(API_KEY);
+        apiBase = "/api";
+      }
+    } catch { }
   })();
 
   const DEFAULT_SETTINGS = { enabled: false, morning: "05:00", evening: "20:00", sound: "chime", volume: 80 };
@@ -1156,7 +1162,7 @@
   function updateApiHint() {
     let msg = "";
     if (location.protocol === "https:" && apiBase.indexOf("http://") === 0) {
-      msg = "<strong>Blocked by your browser:</strong> this page is HTTPS but the server address is http://. Browsers block that. Instead open the app on your phone at <strong>http://192.168.0.101:8000</strong> (same Wi-Fi as your PC), and the Server address will fill in automatically.";
+      msg = "<strong>Blocked by your browser:</strong> this HTTPS page can't talk to an http:// server. On your PC open <strong>http://localhost:8000/connect</strong> and scan the QR code with your phone instead.";
     }
     authApiHint.innerHTML = msg;
   }
@@ -1199,9 +1205,13 @@
       showApp();
       await loadTasks();
     } catch (err) {
-      authError.textContent = (err && err.status)
-        ? err.message
-        : "Can't reach the server at " + apiBase + ". Check the Server address above and that the backend is running.";
+      if (!err.status && location.protocol === "https:" && apiBase.indexOf("http://") === 0) {
+        authError.textContent = "Blocked by your browser: this HTTPS page can't reach the http:// server. On your PC open http://localhost:8000/connect and scan the QR code with your phone.";
+      } else {
+        authError.textContent = (err && err.status)
+          ? err.message
+          : "Can't reach the server at " + (apiBase === "/api" ? location.origin + "/api" : apiBase) + ". Check the Server address above and that the backend is running.";
+      }
       authError.hidden = false;
     } finally {
       authBtn.classList.remove("auth-loading");
