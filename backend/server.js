@@ -29,9 +29,11 @@ app.use(express.static(STATIC_DIR));
 
 function lanIps() {
   const out = [];
-  for (const list of Object.values(os.networkInterfaces())) {
+  const VIRTUAL = /virtual|vethernet|vswitch|hyper|wsl|docker|loopback|vmware|vmnet|bluetooth|tap|tun|tailscale|zerotier/i;
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    if (VIRTUAL.test(name)) continue;
     for (const iface of list || []) {
-      if (iface.family === "IPv4" && !iface.internal) out.push(iface.address);
+      if (iface.family === "IPv4" && !iface.internal) out.push({ name, address: iface.address });
     }
   }
   return out;
@@ -39,12 +41,12 @@ function lanIps() {
 
 app.get("/connect", (_req, res) => {
   const ips = lanIps();
-  const cards = ips.map((ip) => {
-    const url = `http://${ip}:${WEB_PORT}/`;
+  const cards = ips.map((entry) => {
+    const url = `http://${entry.address}:${WEB_PORT}/`;
     return `
       <div style="background:#ffffff;border-radius:16px;padding:22px;text-align:center;box-shadow:0 4px 20px rgba(2,74,134,.12);margin-bottom:18px">
-        <div style="font-size:15px;color:#0a7bc4;font-weight:700;margin-bottom:6px">Open on your phone</div>
-        <a href="${url}" style="font-size:26px;font-weight:800;color:#0b4f8a;text-decoration:none;word-break:break-all">${url}</a>
+        <div style="font-size:14px;color:#0a7bc4;font-weight:700;margin-bottom:6px">Connect via ${entry.name} (${entry.address})</div>
+        <a href="${url}" style="font-size:24px;font-weight:800;color:#0b4f8a;text-decoration:none;word-break:break-all">${url}</a>
         <div style="margin-top:14px">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(url)}" alt="QR code" width="240" height="240" style="border-radius:10px">
         </div>
